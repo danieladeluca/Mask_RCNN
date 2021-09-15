@@ -72,7 +72,7 @@ def random_colors(N, bright=True):
 def apply_mask(image, mask, color, alpha=1): # alpha was 0.5 before
     """Apply the given mask to the image.
     """
-    color = [0, 0, 0]
+    color = [0, 0, 100]
     for c in range(3):
         image[:, :, c] = np.where(mask == 1,
                                   image[:, :, c] *
@@ -80,6 +80,78 @@ def apply_mask(image, mask, color, alpha=1): # alpha was 0.5 before
                                   image[:, :, c])
     return image
 
+def only_mask(image, mask, color, alpha=1):
+    "Show only the mask"
+
+    bg_color = [0, 0, 0]
+
+    for c in range(3):
+        image[:, :, c] = np.where(mask == 1,
+                                  image[:, :, c] *
+                                  (1 - alpha) + alpha * color[c] * 255,
+                                  image[:, :, c])
+
+        image[:, :, c] = np.where(mask != 1,
+                                  image[:,:,c]*
+                                  (1-alpha) + alpha * bg_color[c] * 255,
+                                  image[:, :, c])
+    return image
+
+def display_masks(image, boxes, masks, class_ids, class_names,
+                      scores=None, title="",
+                      figsize=(16, 16), ax=None,
+                      show_mask=True,
+                      colors=None, captions=None):
+
+    "Show the black/white mask of the objects detected in the picture"
+
+    # Number of instances
+    N = boxes.shape[0]
+    if not N:
+        print("\n*** No instances to display *** \n")
+    else:
+        assert boxes.shape[0] == masks.shape[-1] == class_ids.shape[0]
+
+    # If no axis is passed, create one and automatically call show()
+    auto_show = False
+    if not ax:
+        _, ax = plt.subplots(1, figsize=figsize)
+        auto_show = True
+
+    # Show area outside image boundaries.
+    height, width = image.shape[:2]
+    ax.set_ylim(height + 10, -10)
+    ax.set_xlim(-10, width + 10)
+    ax.axis('off')
+    ax.set_title(title)
+
+    masked_image = image.astype(np.uint32).copy()
+    for i in range(N):
+        color = [0, 0, 100]
+
+        # Mask
+        mask = masks[:, :, i]
+        if show_mask:
+            masked_image = only_mask(masked_image, mask, color)
+
+        # Mask Polygon
+        # Pad to ensure proper polygons for masks that touch image edges.
+        padded_mask = np.zeros(
+            (mask.shape[0] + 2, mask.shape[1] + 2), dtype=np.uint8)
+        padded_mask[1:-1, 1:-1] = mask
+        contours = find_contours(padded_mask, 0.5)
+        for verts in contours:
+            # Subtract the padding and flip (y, x) to (x, y)
+            verts = np.fliplr(verts) - 1
+            p = Polygon(verts, facecolor="none", edgecolor=[0, 0, 0])
+            ax.add_patch(p)
+    ax.imshow(masked_image.astype(np.uint8))
+    if auto_show:
+        plt.savefig('segmented_12.png')
+        plt.show()
+
+
+###############################################################################
 
 def display_instances(image, boxes, masks, class_ids, class_names,
                       scores=None, title="",
@@ -123,7 +195,7 @@ def display_instances(image, boxes, masks, class_ids, class_names,
 
     masked_image = image.astype(np.uint32).copy()
     for i in range(N):
-        color = [0, 0, 0]
+        color = [4294967295, 4294967295, 4294967295]
 
         # Bounding box
         if not np.any(boxes[i]):
